@@ -1,0 +1,26 @@
+{
+    "config": {
+        "user": {
+            "step": {
+                "user": {
+                    "data": {
+                        "mac": "MAC osoite",
+                        "name": "Laitteen nimi"
+                    },
+                    "description": {
+                        "hint": "Lichaser laitteita ei löytynyt automaattisesti"
+                    }
+                },
+                "manual": {
+                    "data": {
+                        "mac": "MAC osoite",
+                        "name": "Laitteen nimi"
+                    },
+                    "description": {
+                        "hint": "Syötä MAC osoite manuaalisesti"
+                    }
+                }
+            }
+        }
+    }
+}

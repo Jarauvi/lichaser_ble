@@ -1,0 +1,13 @@
+{
+    "domain": "lichaser_ble",
+    "name": "Lichaser BLE",
+    "codeowners": ["@Jarauvi"],
+    "config_flow": true,
+    "dependencies": ["bluetooth"],
+    "documentation": "https://github.com/Jarauvi/lichaser_ble/tree/main",
+    "iot_class": "local_polling",
+    "issue_tracker": "https://github.com/Jarauvi/lichaser_ble/issues",
+    "loggers": ["custom_components.lichaser_ble"],
+    "requirements": [],
+    "version": "0.1.0"
+  }
