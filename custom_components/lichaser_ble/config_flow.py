@@ -1,87 +1,111 @@
-import logging
-import voluptuous as vol
+"""Config flow for Lichaser BLE integration."""
+from __future__ import annotations
 
+import logging
+from typing import Any
+
+import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.components import bluetooth as bt
 from homeassistant.core import callback
-from homeassistant.helpers import device_registry as dr
-from homeassistant.components import bluetooth
+from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
-    DOMAIN,
+    CONF_KEEP_CONNECTED,
     CONF_MAC,
     CONF_NAME,
+    DEFAULT_KEEP_CONNECTED,
     DEFAULT_NAME,
-    SERVICE_UUID
+    DOMAIN,
+    SUPPORTED_DEVICES
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 class LichaserFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
-    """Config flow for Lichaser BLE integration."""
+    """Handle a config flow for Lichaser BLE."""
 
     VERSION = 1
 
-    async def async_step_user(self, user_input=None):
-        """Show list of discovered Lichaser devices to user."""
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> LichaserOptionsFlowHandler:
+        """Return the options flow handler."""
+        return LichaserOptionsFlowHandler(config_entry)
 
-        # Step 1: get all discovered BLE devices
-        discovered_devices = []
-        for service_info in bluetooth.async_discovered_service_info(self.hass):
-            # Check if this service_info advertises our Lichaser service UUID
-            if SERVICE_UUID.lower() in [uuid.lower() for uuid in service_info.service_uuids]:
-                discovered_devices.append(service_info.device)
+async def async_step_user(self, user_input=None):
+    """Handle the initial setup flow with autodiscovery."""
+    if user_input is not None:
+        mac = user_input[CONF_MAC]
+        await self.async_set_unique_id(mac)
+        self._abort_if_unique_id_configured()
 
-        # Step 2: filter out already configured devices
-        configured_macs = [entry.data[CONF_MAC] for entry in self._async_current_entries()]
-        available_devices = [
-            (dev.address, dev.name or DEFAULT_NAME)
-            for dev in discovered_devices
-            if dev.address not in configured_macs
-        ]
+        return self.async_create_entry(
+            title=user_input.get(CONF_NAME, DEFAULT_NAME),
+            data={
+                CONF_MAC: mac,
+                CONF_NAME: user_input.get(CONF_NAME, DEFAULT_NAME)
+            }
+        )
 
-        # Step 3: fallback if nothing found
-        if not available_devices:
-            return self.async_show_form(
-                step_id="manual",
-                data_schema=vol.Schema({
-                    vol.Required(CONF_MAC): str,
-                    vol.Optional(CONF_NAME, default=DEFAULT_NAME): str
-                }),
-                description_placeholders={"hint": self.hass.config.translation_string("config.user.step.manual.description.hint")}
-            )
+    # Look for Lichaser devices currently in range
+    discovered_devices = []
+    for service_info in bt.async_discovered_service_info(self.hass):
+        # Normalize all discovered UUIDs to lowercase for comparison
+        advertised_uuids = [u.lower() for u in service_info.service_uuids]
+        
+        # Check if any of our supported UUIDs are present in the advertisement
+        for supported_uuid in SUPPORTED_DEVICES:
+            if supported_uuid.lower() in advertised_uuids:
+                discovered_devices.append(service_info)
+                break 
 
-        # Step 4: show dropdown of available devices
-        options = {mac: name for mac, name in available_devices}
-        data_schema = vol.Schema({
+    # When creating the list for the user to see:
+    available = [
+        (info.address, f"{info.name or SUPPORTED_DEVICES.get(supported_uuid)} ({info.address})")
+        for info in discovered_devices
+    ]
+
+    # Mo devices found: allow manual entry
+    if not available:
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema({
+                vol.Required(CONF_MAC): str,
+                vol.Optional(CONF_NAME, default=DEFAULT_NAME): str
+            }),
+            errors={"base": "no_devices_found"}
+        )
+
+    # Show the Combobox
+    options = {mac: name for mac, name in available}
+    return self.async_show_form(
+        step_id="user",
+        data_schema=vol.Schema({
             vol.Required(CONF_MAC): vol.In(options),
             vol.Optional(CONF_NAME, default=DEFAULT_NAME): str
         })
-
-        if user_input is not None:
-            # User selected a MAC from dropdown
-            return self.async_create_entry(
-                title=user_input.get(CONF_NAME, DEFAULT_NAME),
-                data={
-                    CONF_MAC: user_input[CONF_MAC],
-                    CONF_NAME: user_input.get(CONF_NAME, DEFAULT_NAME)
-                }
-            )
-
-        return self.async_show_form(step_id="user", data_schema=data_schema)
+    )
 
 class LichaserOptionsFlowHandler(config_entries.OptionsFlow):
-    """Options flow for Lichaser LED integration."""
-    def __init__(self, config_entry):
-        self.config_entry = config_entry
+    """Handle changes to integration settings after installation."""
 
-    async def async_step_init(self, user_input=None):
-        """Manage optional settings (future expansion: e.g., effects)."""
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Manage the configuration options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
+
+        # Current value from entry options or default if never set
+        keep_connected = self.config_entry.options.get(
+            CONF_KEEP_CONNECTED, DEFAULT_KEEP_CONNECTED
+        )
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
-                vol.Optional("default_effect", default="None"): str
+                vol.Optional(
+                    CONF_KEEP_CONNECTED, 
+                    default=keep_connected
+                ): bool,
             })
         )

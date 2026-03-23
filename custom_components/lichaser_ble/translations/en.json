@@ -1,0 +1,31 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure Lichaser BLE",
+        "description": "Select a discovered device or enter the MAC address manually.",
+        "data": {
+          "mac": "MAC Address",
+          "name": "Device Name"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "no_devices_found": "No Lichaser devices found in range."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Lichaser Settings",
+        "data": {
+          "keep_connected": "Maintain persistent connection (Faster response, but locks phone app)"
+        }
+      }
+    }
+  }
+}

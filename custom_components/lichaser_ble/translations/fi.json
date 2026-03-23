@@ -1,0 +1,31 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Määritä Lichaser BLE",
+        "description": "Valitse löydetty laite tai syötä MAC-osoite manuaalisesti.",
+        "data": {
+          "mac": "MAC-osoite",
+          "name": "Laitteen nimi"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Laite on jo määritetty"
+    },
+    "error": {
+      "cannot_connect": "Yhteyden muodostaminen epäonnistui",
+      "no_devices_found": "Lichaser-laitteita ei löytynyt alueelta."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Lichaser-asetukset",
+        "data": {
+          "keep_connected": "Pidä yhteys aktiivisena (Nopeampi vaste, mutta varaa laitteen puhelinsovellukselta)"
+        }
+      }
+    }
+  }
+}
