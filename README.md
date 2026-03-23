@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://github.com/Jarauvi/lichaser_ble/raw/main/images/logo_ble.png" alt="Lichaser BLE Logo" width="500">
 
-  # WIP: Lichaser BLE for Home Assistant
+  # WIP: Lichaser BLE integration for Home Assistant
   
   [![Home Assistant](https://img.shields.io/badge/home%20assistant-%2341BDF5.svg?style=for-the-badge&logo=home-assistant&logoColor=white)](https://www.home-assistant.io/)
   [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://hacs.xyz/)
@@ -12,9 +12,10 @@
   ![Cloud Polling](https://img.shields.io/badge/IOT_class-Local_push-blue)
 
   **Lichaser BLE** is a Home Assistant integration for local control of Lichaser branded Bluetooth LED strips.
-
+  This integration is based on my previous reverse engineering of Lichaser lights. If you need remote mqtt bridge for controlling lights, [check out this repo](https://github.com/Jarauvi/lichaser_led_ble_control)
 
 </div>
+
 ---
 
 > [!IMPORTANT]
