@@ -1,20 +1,20 @@
 {
-  "bluetooth": [
-  {
-    "service_uuid": "00005a02-0000-1000-8000-00805f9b34fb"
-  },
-  {
-    "local_name": "IOTBT*" 
-  },
-  {
-    "manufacturer_id": 23042
-  },
-  {
-    "local_name": "Lichaser*" 
-  }
-  ], 
-  "domain": "lichaser_ble",
+    "domain": "lichaser_ble",
     "name": "Lichaser BLE",
+    "bluetooth": [
+      {
+        "service_uuid": "00005a02-0000-1000-8000-00805f9b34fb"
+      },
+      {
+        "local_name": "IOTBT*" 
+      },
+      {
+        "manufacturer_id": 23042
+      },
+      {
+        "local_name": "Lichaser*" 
+      }
+    ], 
     "codeowners": ["@Jarauvi"],
     "config_flow": true,
     "dependencies": ["bluetooth"],
