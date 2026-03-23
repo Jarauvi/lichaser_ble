@@ -1,8 +1,17 @@
 {
   "bluetooth": [
-    {
-      "service_uuid": "0000ff01-0000-1000-8000-00805f9b34fb"
-    }
+  {
+    "service_uuid": "00005a02-0000-1000-8000-00805f9b34fb"
+  },
+  {
+    "local_name": "IOTBT*" 
+  },
+  {
+    "manufacturer_id": 23042
+  },
+  {
+    "local_name": "Lichaser*" 
+  }
   ], 
   "domain": "lichaser_ble",
     "name": "Lichaser BLE",

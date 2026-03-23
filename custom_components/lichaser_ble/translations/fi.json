@@ -1,6 +1,10 @@
 {
   "config": {
     "step": {
+      "bluetooth_confirm": {
+        "title": "Määritä {name}",
+        "description": "Haluatko lisätä Lichaser BLE -valon **{name}** Home Assistantiin?"
+      },
       "user": {
         "title": "Määritä Lichaser BLE",
         "description": "Valitse löydetty laite tai syötä MAC-osoite manuaalisesti.",
@@ -23,7 +27,7 @@
       "init": {
         "title": "Lichaser-asetukset",
         "data": {
-          "keep_connected": "Pidä yhteys aktiivisena (Nopeampi vaste, mutta varaa laitteen puhelinsovellukselta)"
+          "keep_device_connected": "Pidä yhteys aktiivisena (Nopeampi vaste, mutta varaa laitteen puhelinsovellukselta)"
         }
       }
     }

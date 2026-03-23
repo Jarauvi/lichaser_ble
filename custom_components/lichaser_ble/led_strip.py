@@ -1,48 +1,77 @@
-"""Packet generator for Lichaser BLE hardware."""
 import logging
 
 _LOGGER = logging.getLogger(__name__)
 
+EFFECT_NONE = "None"
+EFFECT_DASHED = "Dashed"
+
+MIN_V = 12
+MAX_V = 100
+
+
 class LedStrip:
-    """Internal state tracker and packet builder for the LED hardware."""
+    def __init__(self, r=255, g=255, b=255, br=255, eff=EFFECT_NONE):
+        self.r = r
+        self.g = g
+        self.b = b
+        self.br = br
+        self.eff = eff
 
-    def __init__(self):
-        self.r = 255
-        self.g = 255
-        self.b = 255
-        self.br = 255
-        self.eff = "None"
+        self.num_segments = 20  # number of LED segments
+        self.header_prefix = "80000057580ae1030014000014"
 
-    def generate_packet(self, command_byte: int = 0x0C) -> bytes:
-        """
-        Construct the byte array for the hardware.
-        """
-        
-        # Example logic based on common BLE strip protocols:
-        # We scale the RGB values by the brightness percentage
-        multiplier = self.br / 255.0
-        red = int(self.r * multiplier)
-        green = int(self.g * multiplier)
-        blue = int(self.b * multiplier)
+        self.teal = (0x0e, 0xe4, 0x0c)
+        self.off = (0x00, 0x00, 0x00)
 
-        # This is a placeholder structure. 
-        # Replace this with the actual byte sequence your hardware expects.
-        packet = bytearray([
-            0x7E,           # Header
-            0x07,           # Length
-            0x05,           # Type
-            0x03,           # RGB Control
-            red,
-            green,
-            blue,
-            0x00,           # White/Warm (if applicable)
-            0xEF            # Footer
-        ])
+    def rgb_to_custom_hsv(self, r, g, b):
+        """Convert RGB to device-specific HSV."""
+        r_f, g_f, b_f = r / 255.0, g / 255.0, b / 255.0
+        max_c, min_c = max(r_f, g_f, b_f), min(r_f, g_f, b_f)
+        diff = max_c - min_c
 
-        _LOGGER.debug("Generated packet: %s", packet.hex())
+        if diff == 0:
+            h = 0
+        elif max_c == r_f:
+            h = (60 * ((g_f - b_f) / diff) + 360) % 360
+        elif max_c == g_f:
+            h = (60 * ((b_f - r_f) / diff) + 120)
+        else:
+            h = (60 * ((r_f - g_f) / diff) + 240)
+
+        # Device-specific scaling
+        return int(h / 2), int(max_c * 100)
+
+    def _dashed_pattern(self):
+        """Generate dashed effect pattern."""
+        return (
+            [self.off] * 4
+            + [self.teal] * 4
+            + [self.off] * 6
+            + [self.teal] * 2
+            + [self.off] * 2
+            + [self.teal] * 2
+        )
+
+    def generate_packet(self, sequence: int = 0x0C) -> bytes:
+        packet = bytearray([0x00, sequence])
+        packet.extend(bytearray.fromhex(self.header_prefix))
+
+        r, g, b = self.r, self.g, self.b
+        br = self.br or 0
+
+        if self.eff == EFFECT_DASHED:
+            for pr, pg, pb in self._dashed_pattern():
+                packet.extend(bytearray([0xA1, pr, pg, pb]))
+
+        else:
+            h, v_raw = self.rgb_to_custom_hsv(r, g, b)
+
+            if br > 0:
+                v = int((br / 255.0) * (MAX_V - MIN_V) + MIN_V)
+            else:
+                v = 0
+
+            for _ in range(self.num_segments):
+                packet.extend(bytearray([0xA1, h, v_raw, v]))
+
         return bytes(packet)
-
-    @property
-    def effect_list(self) -> list[str]:
-        """Return a list of supported effects."""
-        return ["None", "Rainbow", "Pulse", "Strobe", "Jumping"]

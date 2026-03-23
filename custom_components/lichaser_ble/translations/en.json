@@ -1,6 +1,10 @@
 {
   "config": {
     "step": {
+      "bluetooth_confirm": {
+        "title": "Configure {name}",
+        "description": "Do you want to add the Lichaser BLE light **{name}** to Home Assistant?"
+      },
       "user": {
         "title": "Configure Lichaser BLE",
         "description": "Select a discovered device or enter the MAC address manually.",
@@ -23,7 +27,7 @@
       "init": {
         "title": "Lichaser Settings",
         "data": {
-          "keep_connected": "Maintain persistent connection (Faster response, but locks phone app)"
+          "keep_device_connected": "Maintain persistent connection (Faster response, but locks phone app)"
         }
       }
     }

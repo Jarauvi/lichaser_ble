@@ -11,31 +11,28 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# Using the Platform enum is the standard for modern integrations
 PLATFORMS: list[Platform] = [Platform.LIGHT]
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Lichaser BLE from a config entry."""
     mac = entry.data["mac"]
-    
-    # 1. Initialize the Bluetooth handler
-    # We use 'client' to avoid shadowing the 'bluetooth' component imports elsewhere
-    client = LichaserBluetooth(hass, mac)
 
-    # 2. Verify device availability
-    # This prevents 'Unavailable' entities if the device is out of range during boot
+    client = LichaserBluetooth(hass, mac, entry)
+
+    # Test connection during setup
     try:
-        await client.async_update() 
+        await client.async_test_connection()
     except Exception as err:
+        _LOGGER.warning(
+            "Failed to connect to Lichaser device %s: %s", mac, err
+        )
         raise ConfigEntryNotReady(
-            f"Could not connect to Lichaser device at {mac}: {err}"
+            f"Could not connect to device at {mac}"
         ) from err
 
-    # 3. Store the client for platform use
-    # Using runtime_data automatically handles cleanup during unloading
     entry.runtime_data = client
 
-    # 4. Forward the setup to the light platform
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
@@ -43,10 +40,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    # Unload platforms (light, etc.) and return the status
+    client: LichaserBluetooth = entry.runtime_data
+
+    await client.disconnect()
+
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
-async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
-    """Handle configuration migrations if the data schema changes in the future."""
+async def async_migrate_entry(
+    hass: HomeAssistant, config_entry: ConfigEntry
+) -> bool:
+    """Handle configuration migrations."""
     return True
