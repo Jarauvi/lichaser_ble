@@ -57,6 +57,10 @@
 
 ## 🎨 Custom Effects
 
+
+> [!IMPORTANT]
+> **Currently only static effects are functional.** Dynamic moving effects will be added if possible to reverse engineer them.
+
 The integration supports user-defined effects defined in a JSON file. By default, the file is named `lichaser_ble_effects.json` and is placed in the Home Assistant configuration directory (e.g. `/config/lichaser_ble_effects.json`). The file path can be changed later in the integration options.
 
 ### JSON Format
