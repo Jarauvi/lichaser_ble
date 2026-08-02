@@ -1,155 +1,154 @@
 """Light platform for Lichaser BLE."""
 from __future__ import annotations
-
 import logging
 from typing import Any
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_EFFECT,
+    ATTR_HS_COLOR,
     ATTR_RGB_COLOR,
     ColorMode,
     LightEntity,
     LightEntityFeature,
 )
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.util.color import color_hs_to_RGB, color_RGB_to_hs
 
 from .const import DOMAIN, CONF_NAME
-from .led_strip import LedStrip
 
 _LOGGER = logging.getLogger(__name__)
 
-
-async def async_setup_entry(
-    hass: HomeAssistant,
-    config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
+async def async_setup_entry(hass, config_entry, async_add_entities):
     client = config_entry.runtime_data
-    name = config_entry.data.get(CONF_NAME, "Lichaser Light")
-
-    async_add_entities([LichaserLight(client, name)])
-
+    async_add_entities([LichaserLight(client)])
 
 class LichaserLight(LightEntity, RestoreEntity):
-    """Representation of a Lichaser BLE Light Strip."""
-
     _attr_has_entity_name = True
-    _attr_color_mode = ColorMode.RGB
-    _attr_supported_color_modes = {ColorMode.RGB}
+    _attr_color_mode = ColorMode.HS
+    _attr_supported_color_modes = {ColorMode.HS, ColorMode.RGB}
     _attr_supported_features = LightEntityFeature.EFFECT
-    _attr_assumed_state = True  # 🔥 critical for BLE devices
 
-    def __init__(self, bt, name: str) -> None:
+    def __init__(self, bt):
         self._bt = bt
         self._attr_unique_id = f"{bt.mac}_light"
-        self._attr_name = name
-
-        # 🔥 SINGLE SOURCE OF TRUTH
-        self._attr_is_on = False
-        self._attr_brightness = 255
-        self._attr_rgb_color = (255, 255, 255)
-        self._attr_effect = "None"
-
-        # Packet builder helper
-        self._strip = LedStrip()
-
-    @property
-    def available(self) -> bool:
-        return True
 
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
             identifiers={(DOMAIN, self._bt.mac)},
-            name=self._attr_name,
-            manufacturer="Lichaser",
-            model="BLE LED Strip Controller",
-            connections={("bluetooth", self._bt.mac)},
+            name=self._bt.entry.data.get(CONF_NAME, "Lichaser Light"),
         )
 
+    @property
+    def is_on(self) -> bool | None:
+        """Return true if light is on."""
+        # Check both the internal attribute and the bluetooth state
+        return self._bt.is_on
+    
+    @property
+    def brightness(self) -> int: return self._bt.strip.br
+
+    @property
+    def hs_color(self) -> tuple[float, float] | None:
+        """Return the current color as Home Assistant HS values."""
+        return color_RGB_to_hs(*self.rgb_color)
+
+    @property
+    def rgb_color(self) -> tuple[int, int, int]:
+        return (self._bt.strip.r, self._bt.strip.g, self._bt.strip.b)
+
     async def async_added_to_hass(self) -> None:
-        """Restore state after restart."""
+        """Handle entity restoration with safety defaults."""
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
 
+        # 1. Default fallback values
+        br = 255
+        rgb = (255, 255, 255)
+        eff = "None"
+        is_on = False
+
         if last_state:
-            _LOGGER.debug("Restoring state: %s", last_state)
+            _LOGGER.debug("Restoring state for %s", self.unique_id)
 
-            self._attr_is_on = last_state.state == "on"
+            br = last_state.attributes.get(ATTR_BRIGHTNESS, 255)
+            eff = last_state.attributes.get(ATTR_EFFECT, "None")
+            is_on = last_state.state == "on"
 
-            self._attr_brightness = last_state.attributes.get(
-                ATTR_BRIGHTNESS, 255
-            )
+            restored_hs = last_state.attributes.get(ATTR_HS_COLOR)
+            if isinstance(restored_hs, (list, tuple)) and len(restored_hs) == 2:
+                rgb = color_hs_to_RGB(*restored_hs)
+            else:
+                restored_rgb = last_state.attributes.get(ATTR_RGB_COLOR)
+                if isinstance(restored_rgb, (list, tuple)) and len(restored_rgb) == 3:
+                    rgb = restored_rgb
 
-            rgb = last_state.attributes.get(ATTR_RGB_COLOR)
-            if rgb:
-                self._attr_rgb_color = tuple(rgb)
+        # 2. Seed the Bluetooth coordinator
+        self._bt.is_on = is_on
+        self._bt.strip.br = br
+        self._bt.strip.r, self._bt.strip.g, self._bt.strip.b = rgb
+        self._bt.strip.eff = eff
 
-            self._attr_effect = last_state.attributes.get(
-                ATTR_EFFECT, "None"
-            )
+        # 3. Set the local entity attributes for the UI
+        self._attr_is_on = is_on
+        self._attr_brightness = br
+        self._attr_rgb_color = rgb
+        self._attr_hs_color = color_RGB_to_hs(*rgb)
+        self._attr_effect = eff
 
-        # Sync internal strip helper
-        self._sync_strip()
-
-        # If light should be ON → push state to device
-        if self._attr_is_on:
-            self.hass.async_create_task(self._apply_state())
-
+        # Update HA internal state so the UI reflects restored values immediately
         self.async_write_ha_state()
 
-    def _sync_strip(self):
-        """Copy entity state → packet builder."""
-        r, g, b = self._attr_rgb_color
-
-        self._strip.r = r
-        self._strip.g = g
-        self._strip.b = b
-        self._strip.br = self._attr_brightness or 0
-        self._strip.eff = self._attr_effect or "None"
-
-    async def _apply_state(self):
-        """Send current state to device."""
-        self._sync_strip()
-
-        # Handle OFF by forcing brightness to 0
-        real_br = self._strip.br
-        if not self._attr_is_on:
-            self._strip.br = 0
-
-        try:
-            packet = self._strip.generate_packet(0x0C)
-            await self._bt.send_command(packet)
-        except Exception as err:
-            _LOGGER.error("Failed to send command: %s", err)
-        finally:
-            self._strip.br = real_br
+        # 4. If the light was ON, trigger a background sync to the hardware
+        if is_on:
+            self.hass.async_create_task(
+                self._bt.update_state(
+                    r=rgb[0],
+                    g=rgb[1],
+                    b=rgb[2],
+                    br=br,
+                    eff=eff,
+                    turn_on=True,
+                )
+            )
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the light on or change settings."""
-        if ATTR_BRIGHTNESS in kwargs:
-            self._attr_brightness = kwargs[ATTR_BRIGHTNESS]
+        """Turn the light on."""
+        rgb = kwargs.get(ATTR_RGB_COLOR)
+        hs_color = kwargs.get(ATTR_HS_COLOR)
+        br = kwargs.get(ATTR_BRIGHTNESS)
+        eff = kwargs.get(ATTR_EFFECT)
 
-        if ATTR_RGB_COLOR in kwargs:
-            self._attr_rgb_color = kwargs[ATTR_RGB_COLOR]
-            self._attr_effect = "None"
+        if hs_color is not None:
+            rgb = color_hs_to_RGB(*hs_color)
 
-        if ATTR_EFFECT in kwargs:
-            self._attr_effect = kwargs[ATTR_EFFECT]
+        # If color wasn't picked, None is passed to update_state
+        # so it keeps the current memory values.
+        r, g, b = rgb if rgb is not None else (None, None, None)
 
+        await self._bt.update_state(r=r, g=g, b=b, br=br, eff=eff, turn_on=True)
+
+        # Sync attributes
         self._attr_is_on = True
+        if br is not None:
+            self._attr_brightness = br
+        if rgb is not None:
+            self._attr_rgb_color = rgb
+            self._attr_hs_color = color_RGB_to_hs(*rgb)
+        if eff is not None:
+            self._attr_effect = eff
 
-        await self._apply_state()
+        _LOGGER.info("Sending values: %s, %s, %s", r, g, b)
         self.async_write_ha_state()
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
+    async def async_turn_off(self, **kwargs):
         """Turn the light off."""
+        # 1. Tell bluetooth to go to 'Off' state (which sends brightness 0)
+        await self._bt.update_state(turn_on=False)
+        
+        # 2. Update local state
         self._attr_is_on = False
-
-        await self._apply_state()
+        
         self.async_write_ha_state()

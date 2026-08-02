@@ -13,26 +13,25 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.LIGHT]
 
-
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Lichaser BLE from a config entry."""
     mac = entry.data["mac"]
-
+    
+    # 1. Initialize the Bluetooth handler
     client = LichaserBluetooth(hass, mac, entry)
 
-    # Test connection during setup
+    # 2. Verify device availability
     try:
-        await client.async_test_connection()
+        await client.async_update() 
     except Exception as err:
-        _LOGGER.warning(
-            "Failed to connect to Lichaser device %s: %s", mac, err
-        )
         raise ConfigEntryNotReady(
-            f"Could not connect to device at {mac}"
+            f"Could not connect to Lichaser device at {mac}: {err}"
         ) from err
 
+    # 3. Store the client for platform use
     entry.runtime_data = client
 
+    # 4. Forward the setup to the light platform
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
@@ -40,15 +39,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    client: LichaserBluetooth = entry.runtime_data
-
-    await client.disconnect()
-
+    # Unload platforms (light, etc.) and return the status
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
-async def async_migrate_entry(
-    hass: HomeAssistant, config_entry: ConfigEntry
-) -> bool:
-    """Handle configuration migrations."""
+async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+    """Handle configuration migrations if the data schema changes in the future."""
     return True
