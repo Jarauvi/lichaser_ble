@@ -29,6 +29,7 @@
 
 ## To Do
 - state is not persistent and it resets when Home Assistant is restarted
+- missing tests
 
 ## 🚀 Installation
 
