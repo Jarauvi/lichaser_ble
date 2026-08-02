@@ -20,6 +20,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # 1. Initialize the Bluetooth handler
     client = LichaserBluetooth(hass, mac, entry)
 
+    client.load_effects()
+
     # 2. Verify device availability
     try:
         await client.async_update() 

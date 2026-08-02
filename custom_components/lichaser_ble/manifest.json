@@ -23,5 +23,5 @@
     "issue_tracker": "https://github.com/Jarauvi/lichaser_ble/issues",
     "loggers": ["custom_components.lichaser_ble"],
     "requirements": [],
-    "version": "0.2.0"
+    "version": "0.3.0"
   }

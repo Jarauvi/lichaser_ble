@@ -55,5 +55,95 @@
 
 ---
 
+## 🎨 Custom Effects
+
+The integration supports user-defined effects defined in a JSON file. By default, the file is named `lichaser_ble_effects.json` and is placed in the Home Assistant configuration directory (e.g. `/config/lichaser_ble_effects.json`). The file path can be changed later in the integration options.
+
+### JSON Format
+
+The file contains a JSON object where each **key** is the effect name (as shown in the Home Assistant effect list) and each **value** is the effect definition:
+
+| Property | Type | Default | Description |
+| --- | --- | --- | --- |
+| `type` | string | `sequence` | Effect type. One of: `sequence`, `static`, `pattern`, `simple`, `blink`, `chase`, `gradient`, `pulse`, `rainbow`, `twinkle` |
+| `colors` | array of `[r, g, b]` | — | List of RGB colors (each value `0`–`255`) used by the effect |
+| `speed` | number | `1` | Animation speed. Higher values slow the effect down |
+| `direction` | string | `forward` | `forward` or `backward` |
+| `steps` | number | `20` | Number of steps in the animation cycle |
+| `offset` | number | `0` | Start offset for the animation |
+
+As a shorthand, a plain array of colors is also accepted and is treated as a `sequence` effect.
+
+### Example
+
+Place a file named `lichaser_ble_effects.json` in your Home Assistant configuration directory with content like this:
+
+```json
+{
+  "Dashed Red": {
+    "type": "sequence",
+    "colors": [
+      [255, 0, 0],
+      [0, 0, 0]
+    ],
+    "speed": 1,
+    "direction": "forward",
+    "steps": 20,
+    "offset": 0
+  },
+  "Sunset Gradient": {
+    "type": "gradient",
+    "colors": [
+      [255, 0, 0],
+      [255, 128, 0],
+      [255, 255, 0]
+    ],
+    "speed": 2
+  },
+  "Ocean Pulse": {
+    "type": "pulse",
+    "colors": [
+      [0, 128, 255]
+    ],
+    "speed": 3,
+    "steps": 30
+  },
+  "Rainbow": {
+    "type": "rainbow",
+    "speed": 2
+  },
+  "Strobe": {
+    "type": "blink",
+    "colors": [
+      [255, 255, 255]
+    ],
+    "speed": 1
+  },
+  "Red Chase": {
+    "type": "chase",
+    "colors": [
+      [255, 0, 0],
+      [255, 128, 0],
+      [255, 255, 0]
+    ],
+    "speed": 4,
+    "direction": "backward"
+  },
+  "Simple Twinkle": {
+    "type": "twinkle",
+    "colors": [
+      [255, 255, 255],
+      [128, 128, 128]
+    ],
+    "speed": 2,
+    "offset": 1
+  }
+}
+```
+
+After adding or changing the file, restart Home Assistant and the new effects will appear in the light's effect list.
+
+---
+
 ## ⚠️ Disclaimer
 This integration is a community project and is **not** affiliated with, endorsed by, or supported by Lichaser. Use at your own risk. 

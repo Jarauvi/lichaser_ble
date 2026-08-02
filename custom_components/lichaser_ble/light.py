@@ -14,6 +14,7 @@ from homeassistant.components.light import (
 )
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.storage import Store
 from homeassistant.util.color import color_hs_to_RGB, color_RGB_to_hs
 
 from .const import DOMAIN, CONF_NAME
@@ -33,6 +34,7 @@ class LichaserLight(LightEntity, RestoreEntity):
     def __init__(self, bt):
         self._bt = bt
         self._attr_unique_id = f"{bt.mac}_light"
+        self._store: Store | None = None
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -59,22 +61,47 @@ class LichaserLight(LightEntity, RestoreEntity):
     def rgb_color(self) -> tuple[int, int, int]:
         return (self._bt.strip.r, self._bt.strip.g, self._bt.strip.b)
 
-    async def async_added_to_hass(self) -> None:
-        """Handle entity restoration with safety defaults."""
-        await super().async_added_to_hass()
-        last_state = await self.async_get_last_state()
+    @property
+    def effect_list(self) -> list[str]:
+        """Expose the disable option plus JSON-defined custom effects to Home Assistant."""
+        effect_names = ["None"]
+        effect_names.extend(sorted(self._bt.strip.custom_effects))
+        return effect_names
 
-        # 1. Default fallback values
-        br = 255
-        rgb = (255, 255, 255)
-        eff = "None"
-        is_on = False
+    def _get_restore_values(self, last_state, persisted_state) -> tuple[int, tuple[int, int, int], str, bool]:
+        """Resolve the best available color/brightness state from restored and persisted values."""
+        br = self._bt.strip.br
+        rgb = (self._bt.strip.r, self._bt.strip.g, self._bt.strip.b)
+        eff = self._bt.strip.eff
+        is_on = self._bt.is_on
 
-        if last_state:
+        if persisted_state:
+            persisted_br = persisted_state.get("brightness")
+            if isinstance(persisted_br, (int, float)):
+                br = int(persisted_br)
+
+            persisted_rgb = persisted_state.get("rgb")
+            if isinstance(persisted_rgb, (list, tuple)) and len(persisted_rgb) == 3:
+                rgb = tuple(int(value) for value in persisted_rgb)
+
+            persisted_eff = persisted_state.get("effect")
+            if isinstance(persisted_eff, str) and persisted_eff:
+                eff = persisted_eff
+
+            persisted_is_on = persisted_state.get("is_on")
+            if isinstance(persisted_is_on, bool):
+                is_on = persisted_is_on
+        elif last_state:
             _LOGGER.debug("Restoring state for %s", self.unique_id)
 
-            br = last_state.attributes.get(ATTR_BRIGHTNESS, 255)
-            eff = last_state.attributes.get(ATTR_EFFECT, "None")
+            restored_br = last_state.attributes.get(ATTR_BRIGHTNESS)
+            if isinstance(restored_br, (int, float)):
+                br = int(restored_br)
+
+            restored_eff = last_state.attributes.get(ATTR_EFFECT)
+            if isinstance(restored_eff, str) and restored_eff:
+                eff = restored_eff
+
             is_on = last_state.state == "on"
 
             restored_hs = last_state.attributes.get(ATTR_HS_COLOR)
@@ -83,7 +110,34 @@ class LichaserLight(LightEntity, RestoreEntity):
             else:
                 restored_rgb = last_state.attributes.get(ATTR_RGB_COLOR)
                 if isinstance(restored_rgb, (list, tuple)) and len(restored_rgb) == 3:
-                    rgb = restored_rgb
+                    rgb = tuple(int(value) for value in restored_rgb)
+
+        return br, rgb, eff, is_on
+
+    async def _async_save_state(self) -> None:
+        """Persist the current light state so it can be restored after a restart."""
+        if self.hass is None:
+            return
+
+        if self._store is None:
+            self._store = Store(self.hass, 1, f"{DOMAIN}/light_state")
+
+        payload = {
+            "brightness": self._attr_brightness if self._attr_brightness is not None else self._bt.strip.br,
+            "rgb": list(self._attr_rgb_color or self.rgb_color),
+            "effect": self._attr_effect if self._attr_effect is not None else self._bt.strip.eff,
+            "is_on": self._attr_is_on if self._attr_is_on is not None else self._bt.is_on,
+        }
+        await self._store.async_save(payload)
+
+    async def async_added_to_hass(self) -> None:
+        """Handle entity restoration with safety defaults."""
+        await super().async_added_to_hass()
+
+        self._store = Store(self.hass, 1, f"{DOMAIN}/light_state")
+        persisted_state = await self._store.async_load()
+        last_state = await self.async_get_last_state()
+        br, rgb, eff, is_on = self._get_restore_values(last_state, persisted_state)
 
         # 2. Seed the Bluetooth coordinator
         self._bt.is_on = is_on
@@ -97,6 +151,8 @@ class LichaserLight(LightEntity, RestoreEntity):
         self._attr_rgb_color = rgb
         self._attr_hs_color = color_RGB_to_hs(*rgb)
         self._attr_effect = eff
+
+        await self._async_save_state()
 
         # Update HA internal state so the UI reflects restored values immediately
         self.async_write_ha_state()
@@ -140,6 +196,8 @@ class LichaserLight(LightEntity, RestoreEntity):
         if eff is not None:
             self._attr_effect = eff
 
+        await self._async_save_state()
+
         _LOGGER.info("Sending values: %s, %s, %s", r, g, b)
         self.async_write_ha_state()
 
@@ -147,8 +205,10 @@ class LichaserLight(LightEntity, RestoreEntity):
         """Turn the light off."""
         # 1. Tell bluetooth to go to 'Off' state (which sends brightness 0)
         await self._bt.update_state(turn_on=False)
-        
+
         # 2. Update local state
         self._attr_is_on = False
-        
+
+        await self._async_save_state()
+
         self.async_write_ha_state()

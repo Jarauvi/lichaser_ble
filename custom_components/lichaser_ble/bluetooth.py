@@ -7,7 +7,9 @@ from bleak.exc import BleakError
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_KEEP_CONNECTED, DEFAULT_KEEP_CONNECTED
+from pathlib import Path
+
+from .const import CONF_EFFECTS_FILE, CONF_KEEP_CONNECTED, DEFAULT_EFFECTS_FILE, DEFAULT_KEEP_CONNECTED
 from .led_strip import LedStrip  # Import your helper here
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,13 +23,26 @@ class LichaserBluetooth:
         self._client: BleakClient | None = None
         self._write_char: str | None = None
         self._disconnect_timer: asyncio.TimerHandle | None = None
-        
+        self._effect_task: asyncio.Task | None = None
+
         self.strip = LedStrip()
         self.is_on = False
 
     @property
     def keep_connected(self) -> bool:
         return self.entry.options.get(CONF_KEEP_CONNECTED, DEFAULT_KEEP_CONNECTED)
+
+    def load_effects(self) -> None:
+        """Load custom effect patterns from a JSON file in the Home Assistant config dir."""
+        effect_file = self.entry.options.get(CONF_EFFECTS_FILE, DEFAULT_EFFECTS_FILE)
+        if not effect_file:
+            return
+
+        effect_path = Path(effect_file)
+        if not effect_path.is_absolute():
+            effect_path = Path(self.hass.config.path(effect_file))
+
+        self.strip.load_effects_from_file(effect_path)
 
     async def _ensure_characteristics(self, client: BleakClient):
         if self._write_char is not None:
@@ -64,6 +79,12 @@ class LichaserBluetooth:
         _LOGGER.debug("Lichaser %s disconnected", self.mac)
         self._client = None
         self._write_char = None
+
+
+    async def _send_packet(self) -> None:
+        """Generate and send the current packet to the device."""
+        packet = self.strip.generate_packet(0x0c)
+        await self.send_command(packet)
 
     async def send_command(self, packet: bytes):
         """Send a raw packet to the hardware."""
@@ -108,12 +129,10 @@ class LichaserBluetooth:
         
         # Temporarily swap for packet generation
         self.strip.br = packet_br
-        packet = self.strip.generate_packet(0x0c)
+        await self._send_packet()
         
         # Swap back so memory stays correct
         self.strip.br = display_br
-        
-        await self.send_command(packet)
 
     async def disconnect(self):
         if self._client and self._client.is_connected:

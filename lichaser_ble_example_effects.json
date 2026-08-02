@@ -1,0 +1,10 @@
+{
+  "Dashed Red": {
+    "type": "sequence",
+    "colors": [[255, 0, 0], [0, 0, 0]],
+    "speed": 1,
+    "direction": "forward",
+    "steps": 20,
+    "offset": 0
+  }
+}

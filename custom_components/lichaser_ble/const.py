@@ -14,3 +14,5 @@ DEFAULT_NAME = "Lichaser"
 DEFAULT_NAME = "Lichaser LED"
 CONF_KEEP_CONNECTED = "keep_device_connected"
 DEFAULT_KEEP_CONNECTED = True
+CONF_EFFECTS_FILE = "effects_file"
+DEFAULT_EFFECTS_FILE = "lichaser_ble_effects.json"
