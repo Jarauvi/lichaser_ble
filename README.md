@@ -28,7 +28,7 @@
 * **Persistent Connection Toggle:** Choose between "Instant Response" (Keep-Alive) or "Resource Friendly" (Disconnect after use) modes.
 
 ## To Do
-- state is not persistent and it resets when Home Assistant is restarted
+
 - missing tests
 
 ## 🚀 Installation
